@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Math Tank Battle - PvP</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        @import url('https://fonts.fonts.fonts.fonts.fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
 
         * {
             box-sizing: border-box;
@@ -503,6 +503,7 @@ class Tank {
         else if (keys[this.controls.left]) { dx = -this.speed; this.dir = 3; }
         else if (keys[this.controls.right]) { dx = this.speed; this.dir = 1; }
 
+        // Tank movement is not conditional on mathProblem state, fixing the freeze issue
         if (dx !== 0 || dy !== 0) {
             if (!this.checkCollision(this.x + dx, this.y)) this.x += dx;
             if (!this.checkCollision(this.x, this.y + dy)) this.y += dy;
@@ -549,9 +550,9 @@ class Tank {
                             this.ammo += 3;
                             createFloatingText(this.x, this.y, "+3 AMMO (Solved!)", "#2ecc71");
                             
-                            // Problem solved! Clear all items and reset math problem
-                            items = []; 
-                            mathProblem = null;
+                            // Problem solved! Reset math problem. 
+                            // The items array will be cleared by updateMathLogic on the next frame.
+                            mathProblem = null; 
                             this.collectedTerms = []; // Reset own
                             
                             // Reset other player's collected terms too
@@ -573,7 +574,8 @@ class Tank {
                         checkWinCondition();
                     }
                 }
-                items.splice(i, 1);
+                // Remove the collected item from the map
+                items.splice(i, 1); 
             }
         }
     }
@@ -743,33 +745,48 @@ function generateMathProblem() {
     // Generate Incorrect Terms
     let wrongTerms = [];
 
-    // Wrong Term 1: Incorrect X-coefficient (e.g., addition mistake in subtraction)
+    // Wrong Term 1 (X): Incorrect X-coefficient (e.g., addition mistake in subtraction)
     let wrongX1Coeff = operation === 0 ? a - c : a + c; // Common mistake is using the wrong sign for the second term
     let wrongX1 = formatTerm(wrongX1Coeff, 'x');
     if (wrongX1 === correctTermX) wrongX1 = formatTerm(ansX + (Math.random() < 0.5 ? 2 : -2), 'x');
     wrongTerms.push(wrongX1);
 
-    // Wrong Term 2: Incorrect Constant term (e.g., incorrect sign change)
+    // Wrong Term 2 (Const): Incorrect Constant term (e.g., incorrect sign change)
     let wrongConst1Coeff = operation === 0 ? b - d : b + d;
     let wrongConst1 = formatTerm(wrongConst1Coeff);
     if (wrongConst1 === correctTermConst.replace('+', '')) wrongConst1 = formatTerm(ansConst + (Math.random() < 0.5 ? 2 : -2));
     if (wrongConst1 && wrongConst1Coeff > 0) wrongConst1 = '+' + wrongConst1;
     wrongTerms.push(wrongConst1);
     
-    // Total of 4 unique terms: Correct X, Correct Const, Wrong X, Wrong Const
+    // NEW Wrong Term 3 (X): Different coefficient mistake
+    let wrongX2Coeff = operation === 0 ? ansX + c : ansX - c; // Another common mistake
+    let wrongX2 = formatTerm(wrongX2Coeff, 'x');
+    if (wrongX2 === correctTermX || wrongX2 === wrongTerms[0]) wrongX2 = formatTerm(ansX + (Math.random() < 0.5 ? 3 : -3), 'x');
+    wrongTerms.push(wrongX2);
+
+    // NEW Wrong Term 4 (Const): Different constant mistake
+    let wrongConst2Coeff = operation === 0 ? ansConst + d : ansConst - d; // Another common mistake
+    let wrongConst2 = formatTerm(wrongConst2Coeff);
+    if (wrongConst2 === correctTermConst.replace('+', '') || wrongConst2 === wrongTerms[1].replace('+', '')) wrongConst2 = formatTerm(ansConst + (Math.random() < 0.5 ? 3 : -3));
+    if (wrongConst2 && wrongConst2Coeff > 0) wrongConst2 = '+' + wrongConst2;
+    wrongTerms.push(wrongConst2);
+    
+    // Total of 6 unique terms: 1 Correct X, 1 Correct Const, 2 Wrong X, 2 Wrong Const
     let termSet = [
         {val: correctTermX, isCorrect: true, type: 'x'},
         {val: correctTermConst, isCorrect: true, type: 'const'},
-        {val: wrongTerms[0], isCorrect: false, type: 'wrong_x'},
-        {val: wrongTerms[1], isCorrect: false, type: 'wrong_const'},
+        {val: wrongTerms[0], isCorrect: false, type: 'wrong_x1'},
+        {val: wrongTerms[1], isCorrect: false, type: 'wrong_const1'},
+        {val: wrongTerms[2], isCorrect: false, type: 'wrong_x2'}, 
+        {val: wrongTerms[3], isCorrect: false, type: 'wrong_const2'}, 
     ];
     
     let finalValues = [];
 
-    // --- SET 1 (for Player 1) ---
+    // --- SET 1 (for Player 1) - 6 items ---
     termSet.forEach(t => finalValues.push({...t, group: 1}));
 
-    // --- SET 2 (for Player 2) - same terms, different positions
+    // --- SET 2 (for Player 2) - 6 items ---
     termSet.forEach(t => finalValues.push({...t, group: 2}));
 
     // Shuffle spatially
@@ -819,7 +836,7 @@ function spawnMathItems(valuesWithMeta) {
 function updateMathLogic() {
     if (gameOver) return;
     if (!mathProblem) {
-        // If there are still items on the field but the math timer ran out, clear them
+        // If there are still items on the field but the math timer ran out or problem was solved, clear them
         if (items.length > 0) items = []; 
         if (items.length === 0) { 
             mathProblem = generateMathProblem(); 
@@ -836,8 +853,7 @@ function updateMathLogic() {
             p1.collectedTerms = []; 
             p2.collectedTerms = []; 
         } else if (items.length === 0) {
-             // Edge case: if a player collects an incorrect item and all items are gone, 
-             // but they haven't solved it, the problem is cleared. This is fine.
+             // If items are gone (because a player collected the last one)
              mathProblem = null;
              p1.collectedTerms = []; 
              p2.collectedTerms = [];
@@ -915,7 +931,8 @@ function gameLoop() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawMap();
     items.forEach(item => {
-        ctx.fillStyle = item.isCorrect ? "#2ecc71" : "#e74c3c"; // Green for Correct, Red for Wrong
+        // Changed to a single color for both correct and incorrect terms
+        ctx.fillStyle = "#9b59b6"; 
         ctx.fillRect(item.x, item.y, 36, 36);
         ctx.strokeStyle = "#fff"; ctx.strokeRect(item.x, item.y, 36, 36);
         
@@ -923,15 +940,13 @@ function gameLoop() {
         ctx.translate(item.x + 18, item.y + 18);
         ctx.rotate(item.rotation);
         
-        // Check if the term is the correct X term or Correct Constant term
-        let isCorrectX = mathProblem && mathProblem.answerTerms.includes(item.val) && item.val.includes('x');
-        let isCorrectConst = mathProblem && mathProblem.answerTerms.includes(item.val) && !item.val.includes('x');
+        // Visual indicators to differentiate X-term (Square outline) and Constant (Circle outline) are kept
+        let isXTerm = item.val.includes('x');
         
-        // Visual indicator for X-term (Square outline) and Constant (Circle outline)
-        if (isCorrectX || (!item.isCorrect && item.val.includes('x'))) {
+        if (isXTerm) {
             ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
             ctx.strokeRect(-16, -16, 32, 32);
-        } else if (isCorrectConst || (!item.isCorrect && !item.val.includes('x'))) {
+        } else { // Constant term
              ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
              ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.stroke();
         }
