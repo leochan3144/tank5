@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Math Tank Battle - PvP</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        * {
+            box-sizing: border-box;
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: #2c3e50;
+            color: white;
+            font-family: 'Press Start 2P', monospace;
+            margin: 0;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column; 
+        }
+
+        /* --- START SCREEN --- */
+        #start-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: #2c3e50;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        #start-screen h1 {
+            color: #f1c40f;
+            text-align: center;
+            font-size: 1.5rem;
+            margin-bottom: 20px;
+            line-height: 1.5;
+        }
+
+        .mode-btn {
+            background: #34495e;
+            color: white;
+            border: 2px solid #7f8c8d;
+            padding: 15px 20px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            width: 80%;
+            max-width: 300px;
+            cursor: pointer;
+            text-align: center;
+            touch-action: manipulation; 
+        }
+        .mode-btn:active { background: #2ecc71; border-color: #27ae60; }
+
+        /* --- GAME CONTAINER --- */
+        #game-container {
+            display: none;
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
+
+        /* --- GENERIC ZONES --- */
+        .player-zone {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 5px;
+            z-index: 10;
+            gap: 5px;
+            background: #34495e;
+        }
+        
+        #game-wrapper {
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        canvas {
+            background-color: #000;
+            border: 2px solid #7f8c8d;
+            image-rendering: pixelated;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        /* --- CONTROLS UI ELEMENTS --- */
+        .info-stack {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            width: 100%;
+            margin-bottom: 5px;
+            /* Transition for smooth movement if modes change */
+            transition: transform 0.2s ease;
+        }
+
+        .player-info {
+            font-size: 0.6rem;
+            padding: 4px;
+            border: 1px solid white;
+            background: rgba(0,0,0,0.3);
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .math-box {
+            background: #000;
+            border: 2px solid #f1c40f;
+            color: #f1c40f;
+            padding: 5px;
+            font-size: 0.6rem;
+            text-align: center;
+            min-height: 30px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 4px;
+            white-space: normal;
+            word-break: break-word;
+            line-height: 1.2;
+        }
+
+        .controls-row {
+            display: flex;
+            flex-direction: row;
+            align-items: center;
+            width: 100%;
+            justify-content: center;
+            gap: 15px;
+        }
+
+        .dpad {
+            display: grid;
+            grid-template-columns: 45px 45px 45px;
+            grid-template-rows: 45px 45px 45px;
+            gap: 3px;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 6px;
+            color: white;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        .btn:active, .btn.pressed { background: rgba(255, 255, 255, 0.4); }
+
+        .btn-up { grid-column: 2; grid-row: 1; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-down { grid-column: 2; grid-row: 3; }
+        .btn-right { grid-column: 3; grid-row: 2; }
+
+        .btn-shoot {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: #e74c3c;
+            border-color: #c0392b;
+            font-size: 0.7rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            cursor: pointer;
+        }
+        .btn-shoot:active, .btn-shoot.pressed { background: #ff6b6b; }
+
+
+        /* --- MODE 1: LANDSCAPE --- */
+        body.mode-landscape #game-container { display: flex; flex-direction: row; }
+        body.mode-landscape #p1-zone { width: 200px; /* REMOVED border-right */ order: 1; }
+        body.mode-landscape #game-wrapper { flex: 1; order: 2; }
+        body.mode-landscape #p2-zone { width: 200px; /* REMOVED border-left */ order: 3; }
+        #p1-zone .player-info { color: #2ecc71; border-color: #2ecc71; }
+        #p2-zone .player-info { color: #3498db; border-color: #3498db; }
+
+
+        /* --- MODE 2: PORTRAIT 1 (Opposite / Head-to-Head) --- */
+        body.mode-portrait-1 #game-container {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        body.mode-portrait-1 .player-zone {
+            flex: none;
+            height: 200px;
+            width: 100%;
+            justify-content: flex-start;
+            padding: 5px 15px;
+        }
+
+        /* Rotate P2 */
+        body.mode-portrait-1 #p2-zone {
+            order: 1;
+            background: #2c3e50;
+            padding-top: 20px !important;
+        }
+        body.mode-portrait-1 #p2-inner {
+            transform: rotate(180deg); 
+            width: 100%;
+        }
+
+        /* P1 Zone */
+        body.mode-portrait-1 #p1-zone {
+            order: 3;
+            background: #2c3e50;
+            padding-top: 0px !important;
+        }
+        body.mode-portrait-1 #p1-inner {
+            width: 100%;
+        }
+
+        /* Layout Changes for Portrait 1: Single Row Info */
+        body.mode-portrait-1 .info-stack {
+            flex-direction: row;
+            justify-content: space-between;
+            width: 100%;
+        }
+        
+        /* SHIFT INFO STACKS FOR PORTRAIT 1 (P1: 65px Up, P2: 75px Down) */
+        body.mode-portrait-1 #p1-zone .info-stack {
+            /* ORIGINAL: -65px (UP 65px). NEW: -55px (UP 55px -> DOWN 10px) */
+            transform: translateY(-55px); 
+        }
+        body.mode-portrait-1 #p2-zone .info-stack {
+            /* P2 is rotated 180deg. Local "-75px" (Up) = Screen "+75px" (Down). */
+            transform: translateY(-75px); 
+        }
+
+        body.mode-portrait-1 .player-info { flex: 1; margin-right: 10px; }
+        body.mode-portrait-1 .math-box { flex: 1; }
+
+        /* Layout Changes for Portrait 1: Corner Controls */
+        body.mode-portrait-1 .controls-row {
+            justify-content: space-between;
+            width: 100%;
+            margin-top: -80px; /* Base position */
+        }
+
+        /* D-PAD SHIFTS */
+        body.mode-portrait-1 #p1-zone .controls-row {
+            /* ORIGINAL: -75px. NEW: -65px (UP 65px -> DOWN 10px) */
+            margin-top: -65px; 
+        }
+        body.mode-portrait-1 #p2-zone .controls-row {
+            margin-top: -82px; /* P2 D-pad Upward 2px (from -80px) */
+        }
+
+        /* Fix P2 Controls Logic (Swapped grid) */
+        body.mode-portrait-1 #p2-zone .btn-up { grid-row: 3; }   
+        body.mode-portrait-1 #p2-zone .btn-down { grid-row: 1; } 
+        body.mode-portrait-1 #p2-zone .btn-left { grid-column: 3; }
+        body.mode-portrait-1 #p2-zone .btn-right { grid-column: 1; }
+
+        body.mode-portrait-1 #game-wrapper {
+            order: 2;
+            flex: 1;
+            z-index: 1; 
+            transform: translateY(-20px); /* Battlefield position UNCHANGED */
+        }
+
+
+        /* --- MODE 3: PORTRAIT 2 (Overlay / Transparent) --- */
+        body.mode-portrait-2 #game-container { display: block; }
+        body.mode-portrait-2 #game-wrapper {
+            width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1;
+        }
+        body.mode-portrait-2 .player-zone {
+            position: absolute; top: 10px; background: transparent; z-index: 20; padding: 0; width: auto;
+        }
+        body.mode-portrait-2 #p1-zone { left: 10px; align-items: flex-start; }
+        body.mode-portrait-2 #p2-zone { right: 10px; align-items: flex-end; }
+        
+        body.mode-portrait-2 .btn, 
+        body.mode-portrait-2 .btn-shoot, 
+        body.mode-portrait-2 .player-info, 
+        body.mode-portrait-2 .math-box {
+            background: rgba(0, 0, 0, 0.15);
+            backdrop-filter: none;
+            border-color: rgba(255,255,255,0.2);
+            color: rgba(255,255,255,0.8);
+        }
+        body.mode-portrait-2 .math-box {
+            min-height: 40px; font-size: 0.6rem; margin-bottom: 5px;
+        }
+        body.mode-portrait-2 .controls-row {
+            flex-direction: column-reverse; gap: 10px;
+        }
+        body.mode-portrait-2 #p1-zone .controls-row { align-items: flex-start; }
+        body.mode-portrait-2 #p2-zone .controls-row { align-items: flex-end; }
+        
+        /* SHIFTS FOR PORTRAIT 2 (Preserved) */
+        body.mode-portrait-2 #p1-zone .btn-shoot {
+            margin-left: 115px; 
+        }
+        body.mode-portrait-2 #p2-zone .btn-shoot {
+            margin-right: 115px; 
+        }
+        body.mode-portrait-2 .dpad {
+            transform: translateY(-70px);
+        }
+
+        /* Modal styling */
+        #game-over-modal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.95); border: 4px solid #fff; padding: 20px;
+            text-align: center; display: none; z-index: 200; width: 80%; max-width: 400px;
+        }
+        #btn-restart {
+            margin-top: 20px; padding: 15px; width: 100%; background: #e74c3c;
+            color: white; border: none; font-family: inherit;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="start-screen">
+        <h1>MATH TANK BATTLE<br>PvP</h1>
+        <button class="mode-btn" onclick="startGame('landscape')">LANDSCAPE MODE<br>(Side by Side)</button>
+        <button class="mode-btn" onclick="startGame('portrait-1')">PORTRAIT MODE 1<br>(Opposite / Head-to-Head)</button>
+        <button class="mode-btn" onclick="startGame('portrait-2')">PORTRAIT MODE 2<br>(Overlay / Top Controls)</button>
+    </div>
+
+    <div id="game-container">
+        
+        <div id="p1-zone" class="player-zone">
+            <div id="p1-inner"> 
+                <div class="info-stack">
+                    <div class="player-info" id="p1-stats">P1 HP: 5 | AMMO: 0</div>
+                    <div id="p1-math" class="math-box">WAITING...</div>
+                </div>
+                <div class="controls-row">
+                    <div class="dpad">
+                        <div class="btn btn-up" data-key="KeyW">W</div>
+                        <div class="btn btn-left" data-key="KeyA">A</div>
+                        <div class="btn btn-down" data-key="KeyS">S</div>
+                        <div class="btn btn-right" data-key="KeyD">D</div>
+                    </div>
+                    <div class="btn btn-shoot" data-key="Space">SHOOT</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="game-wrapper">
+            <canvas id="game-canvas" width="800" height="600"></canvas>
+            <div id="game-over-modal">
+                <h2 id="winner-text">WINNER</h2>
+                <p id="win-reason">Reason</p>
+                <button id="btn-restart">PLAY AGAIN</button>
+            </div>
+        </div>
+
+        <div id="p2-zone" class="player-zone">
+            <div id="p2-inner"> 
+                <div class="info-stack">
+                    <div class="player-info" id="p2-stats">P2 HP: 5 | AMMO: 0</div>
+                    <div id="p2-math" class="math-box">WAITING...</div>
+                </div>
+                <div class="controls-row">
+                    <div class="dpad">
+                        <div class="btn btn-up" data-key="ArrowUp">▲</div>
+                        <div class="btn btn-left" data-key="ArrowLeft">◄</div>
+                        <div class="btn btn-down" data-key="ArrowDown">▼</div>
+                        <div class="btn btn-right" data-key="ArrowRight">►</div>
+                    </div>
+                    <div class="btn btn-shoot" data-key="Enter">SHOOT</div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+<script>
+/** * --- GAME LOGIC --- */
+
+const canvas = document.getElementById('game-canvas');
+const ctx = canvas.getContext('2d');
+const TILE_SIZE = 40;
+const MAP_ROWS = 15; 
+const MAP_COLS = 20; 
+
+// Input State
+const keys = {};
+
+// Audio
+const AudioContext = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new AudioContext();
+    }
+    if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
+function playSound(type) {
+    if (!audioCtx) return; 
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+
+    if (type === 'shoot') {
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.1);
+        gainNode.gain.setValueAtTime(0.05, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+    } else if (type === 'damage') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(10, audioCtx.currentTime + 0.2);
+        gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.2);
+    }
+}
+
+// Global Variables
+let gameOver = false;
+let mathProblem = null;
+let mathTimer = 0;
+let items = []; 
+let bullets = [];
+let particles = [];
+let floatingTexts = [];
+let p1, p2;
+let walls = [];
+let animationFrameId = null;
+
+// Map Config
+const INITIAL_MAP = [
+    [0,0,0,0,0,0,0,0,2,1,1,1,1,0,0,0,0,0,0,0], 
+    [0,0,0,0,0,0,0,0,2,9,2,1,0,0,0,0,0,0,0,0], 
+    [0,0,1,1,1,0,0,0,2,2,2,1,0,0,1,1,1,0,0,0], 
+    [0,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0],
+    [0,0,1,1,1,0,2,1,0,0,0,1,2,0,1,1,1,0,0,0],
+    [0,0,0,0,0,0,2,0,0,0,0,0,2,0,0,0,0,0,0,0],
+    [0,1,0,1,2,2,2,0,0,0,0,0,2,2,2,1,0,1,0,0],
+    [0,0,0,0,0,0,0,0,3,3,3,0,0,0,0,0,0,0,0,0], 
+    [0,1,0,1,2,2,2,0,0,0,0,0,2,2,2,1,0,1,0,0],
+    [0,0,0,0,0,0,2,0,0,0,0,0,2,0,0,0,0,0,0,0],
+    [0,0,1,1,1,0,2,1,0,0,0,1,2,0,1,1,1,0,0,0],
+    [0,0,1,0,1,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0],
+    [0,0,1,1,1,0,0,1,2,2,2,0,0,0,1,1,1,0,0,0], 
+    [0,0,0,0,0,0,0,1,2,9,2,0,0,0,0,0,0,0,0,0], 
+    [0,0,0,0,0,0,1,1,1,1,2,0,0,0,0,0,0,0,0,0]  
+];
+
+const BASES = [
+    { id: 1, x: 9.5 * TILE_SIZE, y: 13.5 * TILE_SIZE, hp: 1, owner: 1, active: true },
+    { id: 2, x: 9.5 * TILE_SIZE, y: 1.5 * TILE_SIZE, hp: 1, owner: 2, active: true } 
+];
+
+class Tank {
+    constructor(id, x, y, color, controls) {
+        this.id = id; this.x = x; this.y = y; this.width = 30; this.height = 30;
+        this.color = color; this.controls = controls; this.speed = 3; this.dir = 0; 
+        this.hp = 5; this.ammo = 0; this.shootCooldown = 0; this.invulnerable = 0;
+        this.collectedTerms = []; // NEW: To track collected polynomial terms
+    }
+
+    update() {
+        if (this.hp <= 0) return;
+        if (this.shootCooldown > 0) this.shootCooldown--;
+        if (this.invulnerable > 0) this.invulnerable--;
+
+        let dx = 0, dy = 0;
+        if (keys[this.controls.up]) { dy = -this.speed; this.dir = 0; }
+        else if (keys[this.controls.down]) { dy = this.speed; this.dir = 2; }
+        else if (keys[this.controls.left]) { dx = -this.speed; this.dir = 3; }
+        else if (keys[this.controls.right]) { dx = this.speed; this.dir = 1; }
+
+        if (dx !== 0 || dy !== 0) {
+            if (!this.checkCollision(this.x + dx, this.y)) this.x += dx;
+            if (!this.checkCollision(this.x, this.y + dy)) this.y += dy;
+        }
+
+        this.x = Math.max(0, Math.min(canvas.width - this.width, this.x));
+        this.y = Math.max(0, Math.min(canvas.height - this.height, this.y));
+
+        if (keys[this.controls.shoot] && this.shootCooldown <= 0 && this.ammo > 0) {
+            this.shoot();
+        }
+        this.checkItemCollection();
+    }
+
+    checkCollision(newX, newY) {
+        let rect = {x: newX, y: newY, w: this.width, h: this.height};
+        for (let w of walls) { if (rectIntersect(rect, w)) return true; }
+        let other = this.id === 1 ? p2 : p1;
+        if (other.hp > 0 && rectIntersect(rect, {x: other.x, y: other.y, w: other.width, h: other.height})) return true;
+        for (let b of BASES) {
+            if (b.active && rectIntersect(rect, {x: b.x - 15, y: b.y - 15, w: 30, h: 30})) return true;
+        }
+        return false;
+    }
+
+    checkItemCollection() {
+        if (!mathProblem) return; // Only process items if a problem is active
+
+        for (let i = items.length - 1; i >= 0; i--) {
+            let item = items[i];
+            let itemRect = {x: item.x, y: item.y, w: TILE_SIZE-4, h: TILE_SIZE-4};
+            let tankRect = {x: this.x, y: this.y, w: this.width, h: this.height};
+
+            if (rectIntersect(tankRect, itemRect)) {
+                
+                if (item.isCorrect) {
+                    // Correct term collected logic
+                    if (!this.collectedTerms.includes(item.val)) {
+                        this.collectedTerms.push(item.val);
+                        createFloatingText(this.x, this.y, `COLLECTED: ${item.val}`, "#3498db");
+
+                        // Check if both terms are collected (x-term and constant term)
+                        if (this.collectedTerms.length === 2) {
+                            this.ammo += 3;
+                            createFloatingText(this.x, this.y, "+3 AMMO (Solved!)", "#2ecc71");
+                            
+                            // Problem solved! Clear all items and reset math problem
+                            items = []; 
+                            mathProblem = null;
+                            this.collectedTerms = []; // Reset own
+                            
+                            // Reset other player's collected terms too
+                            const otherPlayer = this.id === 1 ? p2 : p1;
+                            otherPlayer.collectedTerms = [];
+                        }
+                    } else {
+                        // Already collected this specific term
+                        createFloatingText(this.x, this.y, "ALREADY HAVE", "#7f8c8d");
+                    }
+                } else {
+                    // Incorrect term collected logic
+                    if (this.invulnerable <= 0) {
+                        this.hp -= 1;
+                        this.invulnerable = 60; 
+                        playSound('damage');
+                        createFloatingText(this.x, this.y, "-1 HP (WRONG TERM)", "#e74c3c");
+                        createExplosion(this.x + this.width/2, this.y + this.height/2, "red");
+                        checkWinCondition();
+                    }
+                }
+                items.splice(i, 1);
+            }
+        }
+    }
+
+    shoot() {
+        this.ammo--;
+        this.shootCooldown = 30; 
+        playSound('shoot');
+        let bx = this.x + this.width/2, by = this.y + this.height/2;
+        let speed = 7, vx = 0, vy = 0;
+        if (this.dir === 0) { vy = -speed; by -= 20; }
+        if (this.dir === 1) { vx = speed; bx += 20; }
+        if (this.dir === 2) { vy = speed; by += 20; }
+        if (this.dir === 3) { vx = -speed; bx -= 20; }
+        bullets.push(new Bullet(bx, by, vx, vy, this.id));
+    }
+
+    draw() {
+        if (this.hp <= 0) return;
+        ctx.save();
+        ctx.translate(this.x + this.width/2, this.y + this.height/2);
+        ctx.rotate(this.dir * 90 * (Math.PI/180));
+        ctx.fillStyle = this.color;
+        if (this.invulnerable > 0 && Math.floor(Date.now() / 100) % 2 === 0) ctx.fillStyle = "#fff";
+        ctx.fillRect(-15, -15, 8, 30);
+        ctx.fillRect(7, -15, 8, 30);
+        ctx.fillStyle = this.color; 
+        if (this.invulnerable > 0 && Math.floor(Date.now() / 100) % 2 === 0) ctx.fillStyle = "#fff";
+        ctx.fillRect(-8, -12, 16, 24);
+        ctx.fillStyle = "#000";
+        ctx.beginPath(); ctx.arc(0, 0, 6, 0, Math.PI*2); ctx.fill();
+        ctx.fillRect(-2, -18, 4, 18);
+        ctx.restore();
+    }
+}
+
+class Bullet {
+    constructor(x, y, vx, vy, ownerId) {
+        this.x = x; this.y = y; this.vx = vx; this.vy = vy; this.ownerId = ownerId; this.active = true;
+    }
+    update() {
+        this.x += this.vx; this.y += this.vy;
+        if (this.x < 0 || this.x > canvas.width || this.y < 0 || this.y > canvas.height) { this.active = false; return; }
+        
+        for (let i = walls.length - 1; i >= 0; i--) {
+            let w = walls[i];
+            if (this.x > w.x && this.x < w.x + w.w && this.y > w.y && this.y < w.y + w.h) {
+                this.active = false; createExplosion(this.x, this.y, "orange");
+                if (w.type === 1) walls.splice(i, 1);
+                return;
+            }
+        }
+        for (let base of BASES) {
+            if (!base.active) continue;
+            if (Math.hypot(this.x - base.x, this.y - base.y) < 20) {
+                this.active = false; base.hp--; createExplosion(base.x, base.y, "yellow");
+                playSound('damage');
+                createFloatingText(base.x - 10, base.y - 10, "-1 HP", "#f1c40f");
+                if (base.hp <= 0) {
+                    base.active = false; createExplosion(base.x, base.y, "red", 50);
+                    let winnerName = (base.owner === 1) ? "Player 2" : "Player 1";
+                    endGame(winnerName, "Base Destroyed!");
+                }
+                return;
+            }
+        }
+        let target = this.ownerId === 1 ? p2 : p1;
+        if (target.hp > 0 && target.invulnerable <= 0 && this.x > target.x && this.x < target.x + target.width && this.y > target.y && this.y < target.y + target.height) {
+            this.active = false; target.hp--; 
+            target.invulnerable = 30; // Brief tank invulnerability after being shot
+            playSound('damage');
+            createExplosion(this.x, this.y, "red"); checkWinCondition();
+        }
+    }
+    draw() { ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(this.x, this.y, 3, 0, Math.PI*2); ctx.fill(); }
+}
+
+class Particle {
+    constructor(x, y, color) { this.x = x; this.y = y; this.vx = (Math.random()-0.5)*5; this.vy = (Math.random()-0.5)*5; this.life = 1.0; this.color = color; }
+    update() { this.x += this.vx; this.y += this.vy; this.life -= 0.05; }
+    draw() { ctx.globalAlpha = this.life; ctx.fillStyle = this.color; ctx.fillRect(this.x, this.y, 4, 4); ctx.globalAlpha = 1.0; }
+}
+
+function rectIntersect(r1, r2) {
+    return !(r2.x > r1.x + r1.w || r2.x + r2.w < r1.x || r2.y > r1.y + r1.h || r2.y + r2.h < r1.y);
+}
+function createExplosion(x, y, color, count=10) { for(let i=0; i<count; i++) particles.push(new Particle(x, y, color)); }
+function createFloatingText(x, y, text, color) { floatingTexts.push({x, y, text, color, life: 1.0}); }
+
+
+/**
+ * Formats a single polynomial term (coefficient + optional variable).
+ * @param {number} coeff The coefficient (can be positive, negative, or zero).
+ * @param {string | null} variable The variable ('x' for x-term, null for constant).
+ * @returns {string | null} The formatted term string (e.g., "7x", "-9", "x", "-x"), or null if coeff is 0.
+ */
+const formatTerm = (coeff, variable = null) => {
+    if (coeff === 0) return null;
+    let s = "";
+    let absCoeff = Math.abs(coeff);
+
+    if (variable) { // Variable term (e.g., 7x)
+        if (absCoeff === 1) s += variable;
+        else s += absCoeff + variable;
+    } else { // Constant term (e.g., -9)
+        s += absCoeff;
+    }
+
+    // Prepend sign
+    if (coeff < 0) s = "-" + s;
+    // Positive terms will be prepended with '+' later if needed for display, 
+    // but the returned string should not have a leading '+'.
+
+    return s;
+};
+
+/* --- NEW MATH LOGIC: POLYNOMIAL SIMPLIFICATION --- */
+function generateMathProblem() {
+    // Generate coefficients between -10 and 10 (excluding 0)
+    const randCoeff = () => {
+        let c;
+        do { c = Math.floor(Math.random() * 21) - 10; } while (c === 0);
+        return c;
+    };
+
+    let a = randCoeff(); // Coeff of x in first binomial
+    let b = randCoeff(); // Constant term in first binomial
+    let c = randCoeff(); // Coeff of x in second binomial
+    let d = randCoeff(); // Constant term in second binomial
+
+    let operation = Math.random() < 0.5 ? 0 : 1; // 0: Addition (+), 1: Subtraction (-)
+    let displayOp = (operation === 0) ? '+' : '-';
+
+    // Calculate Correct Answer
+    let ansX, ansConst;
+    if (operation === 0) { // (ax + b) + (cx + d) = (a+c)x + (b+d)
+        ansX = a + c;
+        ansConst = b + d;
+    } else { // (ax + b) - (cx + d) = (a-c)x + (b-d)
+        ansX = a - c;
+        ansConst = b - d;
+    }
+
+    // Ensure the answer is still a two-term polynomial (non-zero x-coeff and non-zero constant)
+    if (ansX === 0 || ansConst === 0 || ansX === a || ansX === c || ansConst === b || ansConst === d) {
+        return generateMathProblem(); // Regenerate if simplification leads to a single term or trivial change
+    }
+    
+    // Format Binomials for Problem Text
+    const formatBinomial = (coeffX, constTerm) => {
+        let xTerm = formatTerm(coeffX, 'x');
+        let constTermStr = formatTerm(constTerm);
+        if (constTerm > 0) constTermStr = "+" + constTermStr;
+        return `(${xTerm}${constTermStr})`;
+    };
+    
+    let problemText = `${formatBinomial(a, b)} ${displayOp} ${formatBinomial(c, d)}`;
+
+    // Correct Answer Terms (Strings used as unique IDs for collection)
+    let correctTermX = formatTerm(ansX, 'x');
+    // Constant term needs a leading sign for positive numbers for item block display
+    let correctTermConst = formatTerm(ansConst);
+    if (ansConst > 0) correctTermConst = '+' + correctTermConst; 
+    
+    const correctTerms = [correctTermX, correctTermConst];
+
+    // Generate Incorrect Terms
+    let wrongTerms = [];
+
+    // Wrong Term 1: Incorrect X-coefficient (e.g., addition mistake in subtraction)
+    let wrongX1Coeff = operation === 0 ? a - c : a + c; // Common mistake is using the wrong sign for the second term
+    let wrongX1 = formatTerm(wrongX1Coeff, 'x');
+    if (wrongX1 === correctTermX) wrongX1 = formatTerm(ansX + (Math.random() < 0.5 ? 2 : -2), 'x');
+    wrongTerms.push(wrongX1);
+
+    // Wrong Term 2: Incorrect Constant term (e.g., incorrect sign change)
+    let wrongConst1Coeff = operation === 0 ? b - d : b + d;
+    let wrongConst1 = formatTerm(wrongConst1Coeff);
+    if (wrongConst1 === correctTermConst.replace('+', '')) wrongConst1 = formatTerm(ansConst + (Math.random() < 0.5 ? 2 : -2));
+    if (wrongConst1 && wrongConst1Coeff > 0) wrongConst1 = '+' + wrongConst1;
+    wrongTerms.push(wrongConst1);
+    
+    // Total of 4 unique terms: Correct X, Correct Const, Wrong X, Wrong Const
+    let termSet = [
+        {val: correctTermX, isCorrect: true, type: 'x'},
+        {val: correctTermConst, isCorrect: true, type: 'const'},
+        {val: wrongTerms[0], isCorrect: false, type: 'wrong_x'},
+        {val: wrongTerms[1], isCorrect: false, type: 'wrong_const'},
+    ];
+    
+    let finalValues = [];
+
+    // --- SET 1 (for Player 1) ---
+    termSet.forEach(t => finalValues.push({...t, group: 1}));
+
+    // --- SET 2 (for Player 2) - same terms, different positions
+    termSet.forEach(t => finalValues.push({...t, group: 2}));
+
+    // Shuffle spatially
+    finalValues.sort(() => Math.random() - 0.5);
+
+    spawnMathItems(finalValues); 
+    return { text: problemText, answerTerms: correctTerms };
+}
+/* --------------------------- */
+
+function spawnMathItems(valuesWithMeta) {
+    items = [];
+    
+    const isHeadToHead = document.body.classList.contains('mode-portrait-1');
+
+    valuesWithMeta.forEach((itemData) => {
+        let placed = false, attempts = 50;
+        while (!placed && attempts > 0) {
+            let c = Math.floor(Math.random() * MAP_COLS), r = Math.floor(Math.random() * MAP_ROWS);
+            if (INITIAL_MAP[r][c] !== 0) { attempts--; continue; }
+            let x = c * TILE_SIZE + 2, y = r * TILE_SIZE + 2;
+            
+            if (Math.hypot(x-p1.x, y-p1.y) < 60 || Math.hypot(x-p2.x, y-p2.y) < 60) { attempts--; continue; }
+            
+            let overlap = false;
+            for(let existing of items) { if (Math.hypot(x - existing.x, y - existing.y) < 40) overlap = true; }
+            if(overlap) { attempts--; continue; }
+
+            let rotation = 0;
+            if (isHeadToHead && itemData.group === 2) {
+                rotation = Math.PI;
+            }
+
+            items.push({
+                x, y, 
+                val: itemData.val, // The formatted string term
+                isCorrect: itemData.isCorrect, 
+                creationTime: Date.now(), 
+                rotation: rotation
+            });
+            placed = true;
+        }
+    });
+}
+/* --------------------------- */
+
+function updateMathLogic() {
+    if (gameOver) return;
+    if (!mathProblem) {
+        // If there are still items on the field but the math timer ran out, clear them
+        if (items.length > 0) items = []; 
+        if (items.length === 0) { 
+            mathProblem = generateMathProblem(); 
+            mathTimer = 1200; // 20 seconds @ 60 FPS
+            p1.collectedTerms = []; 
+            p2.collectedTerms = [];
+        }
+    } else {
+        mathTimer--;
+        // If the problem is solved (items.length === 0) or time runs out, clear the problem
+        if (mathTimer <= 0) { 
+            mathProblem = null; 
+            items = []; 
+            p1.collectedTerms = []; 
+            p2.collectedTerms = []; 
+        } else if (items.length === 0) {
+             // Edge case: if a player collects an incorrect item and all items are gone, 
+             // but they haven't solved it, the problem is cleared. This is fine.
+             mathProblem = null;
+             p1.collectedTerms = []; 
+             p2.collectedTerms = [];
+        }
+    }
+}
+
+function checkWinCondition() {
+    if (p1.hp <= 0) endGame("Player 2", "Player 1 Destroyed!");
+    if (p2.hp <= 0) endGame("Player 1", "Player 2 Destroyed!");
+}
+
+function endGame(winner, reason) {
+    if (gameOver) return;
+    gameOver = true;
+    document.getElementById('winner-text').innerText = winner + " WINS!";
+    document.getElementById('win-reason').innerText = reason;
+    document.getElementById('game-over-modal').style.display = "block";
+}
+
+function updateUI() {
+    document.getElementById('p1-stats').innerText = `P1 HP: ${p1.hp} | AMMO: ${p1.ammo}`;
+    document.getElementById('p2-stats').innerText = `P2 HP: ${p2.hp} | AMMO: ${p2.ammo}`;
+    
+    let mathText = "WAITING...";
+    let styleColor = "#95a5a6";
+    
+    const p1MathBox = document.getElementById('p1-math');
+    const p2MathBox = document.getElementById('p2-math');
+
+    if (mathProblem) {
+        let timerDisplay = `<span style="font-size:0.6em">(${Math.ceil(mathTimer / 60)}s)</span>`;
+        styleColor = "#f1c40f";
+
+        // P1 Display: Terms Collected & Problem
+        let p1TermsLeft = 2 - p1.collectedTerms.length;
+        p1MathBox.innerHTML = `<span style="font-weight: normal; font-size: 0.8em; color: #2ecc71;">TERMS LEFT: ${p1TermsLeft}/2</span><br>${mathProblem.text} ${timerDisplay}`;
+
+        // P2 Display: Terms Collected & Problem
+        let p2TermsLeft = 2 - p2.collectedTerms.length;
+        p2MathBox.innerHTML = `<span style="font-weight: normal; font-size: 0.8em; color: #3498db;">TERMS LEFT: ${p2TermsLeft}/2</span><br>${mathProblem.text} ${timerDisplay}`;
+        
+    } else {
+        p1MathBox.innerHTML = mathText; 
+        p2MathBox.innerHTML = mathText;
+    }
+
+    p1MathBox.style.borderColor = styleColor; 
+    p2MathBox.style.borderColor = styleColor;
+}
+
+function drawMap() {
+    walls.forEach(w => {
+        if (w.type === 1) { ctx.fillStyle = "#d35400"; ctx.fillRect(w.x, w.y, w.w, w.h); ctx.fillStyle = "#e67e22"; ctx.fillRect(w.x+2, w.y+2, w.w-4, w.h-4); }
+        else if (w.type === 2) { ctx.fillStyle = "#bdc3c7"; ctx.fillRect(w.x, w.y, w.w, w.h); ctx.fillStyle = "#ecf0f1"; ctx.fillRect(w.x+5, w.y+5, w.w-10, w.h-10); }
+        else if (w.type === 3) { ctx.fillStyle = "#2980b9"; ctx.fillRect(w.x, w.y, w.w, w.h); }
+    });
+    BASES.forEach(b => {
+        if (!b.active) return;
+        ctx.fillStyle = b.owner === 1 ? "#27ae60" : "#2980b9";
+        ctx.beginPath(); ctx.arc(b.x, b.y, 15, 0, Math.PI*2); ctx.fill();
+        ctx.fillStyle = "#f1c40f"; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font="20px Arial";
+        ctx.fillText(b.owner === 1 ? "🦅" : "⭐", b.x, b.y+2);
+    });
+}
+
+function gameLoop() {
+    if (gameOver) return;
+    p1.update(); p2.update();
+    bullets.forEach(b => b.update()); bullets = bullets.filter(b => b.active);
+    particles.forEach(p => p.update()); particles = particles.filter(p => p.life > 0);
+    floatingTexts.forEach(ft => ft.life -= 0.02); floatingTexts = floatingTexts.filter(ft => ft.life > 0);
+    updateMathLogic(); updateUI();
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawMap();
+    items.forEach(item => {
+        ctx.fillStyle = item.isCorrect ? "#2ecc71" : "#e74c3c"; // Green for Correct, Red for Wrong
+        ctx.fillRect(item.x, item.y, 36, 36);
+        ctx.strokeStyle = "#fff"; ctx.strokeRect(item.x, item.y, 36, 36);
+        
+        ctx.save();
+        ctx.translate(item.x + 18, item.y + 18);
+        ctx.rotate(item.rotation);
+        
+        // Check if the term is the correct X term or Correct Constant term
+        let isCorrectX = mathProblem && mathProblem.answerTerms.includes(item.val) && item.val.includes('x');
+        let isCorrectConst = mathProblem && mathProblem.answerTerms.includes(item.val) && !item.val.includes('x');
+        
+        // Visual indicator for X-term (Square outline) and Constant (Circle outline)
+        if (isCorrectX || (!item.isCorrect && item.val.includes('x'))) {
+            ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+            ctx.strokeRect(-16, -16, 32, 32);
+        } else if (isCorrectConst || (!item.isCorrect && !item.val.includes('x'))) {
+             ctx.strokeStyle = "#fff"; ctx.lineWidth = 2;
+             ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.stroke();
+        }
+
+        ctx.fillStyle = "#fff"; 
+        ctx.font = "bold 14px 'Press Start 2P', monospace"; 
+        ctx.textAlign = "center"; 
+        ctx.textBaseline = "middle";
+        ctx.fillText(item.val, 0, 0);
+
+        ctx.restore();
+    });
+    BASES.forEach(b => { if(!b.active) { ctx.fillStyle = "#555"; ctx.fillRect(b.x-15, b.y-15, 30, 30); } });
+    bullets.forEach(b => b.draw());
+    p1.draw(); p2.draw();
+    particles.forEach(p => p.draw());
+    floatingTexts.forEach(ft => {
+        ctx.fillStyle = ft.color; ctx.globalAlpha = Math.max(0, ft.life);
+        ctx.font = "bold 14px sans-serif"; ctx.fillText(ft.text, ft.x, ft.y - (1.0 - ft.life) * 20);
+        ctx.globalAlpha = 1.0;
+    });
+
+    animationFrameId = requestAnimationFrame(gameLoop);
+}
+
+// --- INITIALIZATION ---
+
+function startGame(mode) {
+    initAudio();
+    document.getElementById('start-screen').style.display = 'none';
+    document.body.className = 'mode-' + mode;
+    document.getElementById('game-container').style.display = 'flex'; // Ensure container is visible
+    initGame();
+}
+
+function bindControls() {
+    const buttons = document.querySelectorAll('.btn, .btn-shoot');
+    buttons.forEach(btn => {
+        const key = btn.getAttribute('data-key');
+        if(!key) return;
+        
+        btn.addEventListener('touchstart', (e) => { 
+            e.preventDefault(); 
+            keys[key] = true; 
+            btn.classList.add('pressed'); 
+            initAudio(); 
+        }, {passive: false});
+
+        btn.addEventListener('touchend', (e) => { e.preventDefault(); keys[key] = false; btn.classList.remove('pressed'); });
+        
+        btn.addEventListener('mousedown', (e) => { 
+            keys[key] = true; 
+            btn.classList.add('pressed'); 
+            initAudio(); 
+        });
+        btn.addEventListener('mouseup', (e) => { keys[key] = false; btn.classList.remove('pressed'); });
+        btn.addEventListener('mouseleave', (e) => { keys[key] = false; btn.classList.remove('pressed'); });
+    });
+    
+    window.addEventListener('keydown', e => { keys[e.code] = true; if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space","Enter"].indexOf(e.code)>-1)e.preventDefault(); initAudio(); });
+    window.addEventListener('keyup', e => keys[e.code] = false);
+
+    document.getElementById('btn-restart').addEventListener('click', () => {
+        initGame();
+    });
+}
+
+function initGame() {
+    if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    
+    walls = [];
+    for (let r = 0; r < MAP_ROWS; r++) {
+        for (let c = 0; c < MAP_COLS; c++) {
+            let code = INITIAL_MAP[r][c];
+            if (code === 1 || code === 2 || code === 3) walls.push({x: c*40, y: r*40, w: 40, h: 40, type: code});
+        }
+    }
+    
+    p1 = new Tank(1, 165, 525, "#2ecc71", {up: "KeyW", down: "KeyS", left: "KeyA", right: "KeyD", shoot: "Space"});
+    p2 = new Tank(2, 605, 45, "#3498db", {up: "ArrowUp", down: "ArrowDown", left: "ArrowLeft", right: "ArrowRight", shoot: "Enter"});
+    
+    BASES.forEach(b => { b.hp = 1; b.active = true; });
+    bullets = []; items = []; particles = []; floatingTexts = [];
+    gameOver = false;
+    mathTimer = 0; 
+    mathProblem = null;
+    p1.collectedTerms = []; // Reset collected terms
+    p2.collectedTerms = []; // Reset collected terms
+    document.getElementById('game-over-modal').style.display = "none";
+    
+    gameLoop();
+}
+
+bindControls();
+
+</script>
+</body>
+</html>
